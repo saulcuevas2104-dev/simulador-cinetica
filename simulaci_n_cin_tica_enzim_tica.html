@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gráfica de Lineweaver-Burk</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Estilo personalizado para los Sliders idéntico al de la imagen */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 8px;
+            height: 20px;
+            background: #0f172a;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scaleY(1.1);
+        }
+
+        input[type=range]::-moz-range-thumb {
+            width: 8px;
+            height: 20px;
+            background: #0f172a;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex justify-center items-center min-h-screen text-slate-800">
+
+    <!-- Contenedor Principal de la Widget -->
+    <div class="w-full max-w-3xl space-y-5 bg-transparent">
+        
+        <!-- Encabezado -->
+        <div>
+            <h1 class="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">Gráfica de Lineweaver-Burk</h1>
+            <p class="text-slate-500 text-sm md:text-base mt-1">Representación de doble recíproco de la cinética enzimática</p>
+        </div>
+
+        <!-- Tarjetas Informativas Superiores -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <!-- Tarjeta 1: Intersección X -->
+            <div class="bg-[#f1f3f5]/80 border border-slate-200/60 p-4 rounded-xl">
+                <div class="text-xs text-slate-500 font-medium">Intersección X (-1/K<sub>m</sub>)</div>
+                <div id="cardX" class="text-xl md:text-2xl font-bold font-mono-num text-[#0066ff] mt-1">-0.500 <span class="text-base font-normal">mM⁻¹</span></div>
+            </div>
+
+            <!-- Tarjeta 2: Intersección Y -->
+            <div class="bg-[#f1f3f5]/80 border border-slate-200/60 p-4 rounded-xl">
+                <div class="text-xs text-slate-500 font-medium">Intersección Y (1/V<sub>max</sub>)</div>
+                <div id="cardY" class="text-xl md:text-2xl font-bold font-mono-num text-[#e6007e] mt-1">0.010 <span class="text-base font-normal">min/µmol</span></div>
+            </div>
+
+            <!-- Tarjeta 3: Pendiente -->
+            <div class="bg-[#f1f3f5]/80 border border-slate-200/60 p-4 rounded-xl">
+                <div class="text-xs text-slate-500 font-medium">Pendiente (K<sub>m</sub>/V<sub>max</sub>)</div>
+                <div id="cardSlope" class="text-xl md:text-2xl font-bold font-mono-num text-slate-900 mt-1">0.0200 <span class="text-base font-normal">min</span></div>
+            </div>
+        </div>
+
+        <!-- Área Gráfica Principal -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 md:p-6 shadow-sm relative">
+            <div class="w-full h-80 relative">
+                <canvas id="lbCanvas" class="w-full h-full block"></canvas>
+            </div>
+        </div>
+
+        <!-- Controles Inferiores -->
+        <div class="bg-[#f1f3f5]/80 border border-slate-200/60 p-5 rounded-2xl space-y-4">
+            <!-- Slider Vmax -->
+            <div class="flex items-center justify-between gap-4">
+                <label for="vmaxInput" class="text-sm font-medium text-slate-700 min-w-[130px]">V<sub>max</sub> (µmol/min)</label>
+                <div class="flex-1 px-2">
+                    <input type="range" id="vmaxInput" min="20" max="200" value="100.0" step="0.5">
+                </div>
+                <span id="vmaxVal" class="text-sm font-bold font-mono-num text-slate-900 min-w-[50px] text-right">100.0</span>
+            </div>
+
+            <!-- Slider Km -->
+            <div class="flex items-center justify-between gap-4">
+                <label for="kmInput" class="text-sm font-medium text-slate-700 min-w-[130px]">K<sub>m</sub> (mM)</label>
+                <div class="flex-1 px-2">
+                    <input type="range" id="kmInput" min="0.5" max="10.0" value="2.00" step="0.05">
+                </div>
+                <span id="kmVal" class="text-sm font-bold font-mono-num text-slate-900 min-w-[50px] text-right">2.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Lógica e Interacción -->
+    <script>
+        const canvas = document.getElementById('lbCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const vmaxInput = document.getElementById('vmaxInput');
+        const kmInput = document.getElementById('kmInput');
+
+        const vmaxVal = document.getElementById('vmaxVal');
+        const kmVal = document.getElementById('kmVal');
+
+        const cardX = document.getElementById('cardX');
+        const cardY = document.getElementById('cardY');
+        const cardSlope = document.getElementById('cardSlope');
+
+        // Función para ajustar resolución retina/high DPI del Canvas
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            drawGraph();
+        }
+
+        function drawGraph() {
+            const width = canvas.getBoundingClientRect().width;
+            const height = canvas.getBoundingClientRect().height;
+
+            // Valores de entrada
+            const Vmax = parseFloat(vmaxInput.value);
+            const Km = parseFloat(kmInput.value);
+
+            // Cálculos
+            const interceptX = -1 / Km;
+            const interceptY = 1 / Vmax;
+            const slope = Km / Vmax;
+
+            // Actualización de textos UI
+            vmaxVal.innerText = Vmax.toFixed(1);
+            kmVal.innerText = Km.toFixed(2);
+
+            cardX.innerHTML = `${interceptX.toFixed(3)} <span class="text-base font-normal">mM⁻¹</span>`;
+            cardY.innerHTML = `${interceptY.toFixed(3)} <span class="text-base font-normal">min/µmol</span>`;
+            cardSlope.innerHTML = `${slope.toFixed(4)} <span class="text-base font-normal">min</span>`;
+
+            // Limpiar Canvas
+            ctx.clearRect(0, 0, width, height);
+
+            // Rangos del gráfico para coordinadas físicas
+            const xMin = -2.4;
+            const xMax = 1.1;
+            const yMin = -0.01;
+            const yMax = 0.058;
+
+            // Mapeo de coordenadas matemáticas a píxeles en Canvas
+            function mapX(x) {
+                return ((x - xMin) / (xMax - xMin)) * (width - 70) + 40;
+            }
+
+            function mapY(y) {
+                return height - 35 - ((y - yMin) / (yMax - yMin)) * (height - 50);
+            }
+
+            // 1. Rejilla punteada de fondo
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.setLineDash([2, 4]);
+            ctx.lineWidth = 1;
+
+            // Líneas de rejilla horizontales (Y)
+            const yTicks = [0.00, 0.01, 0.02, 0.03, 0.04, 0.05];
+            yTicks.forEach(y => {
+                const py = mapY(y);
+                ctx.beginPath();
+                ctx.moveTo(mapX(xMin), py);
+                ctx.lineTo(mapX(xMax), py);
+                ctx.stroke();
+
+                // Etiquetas Y
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(y.toFixed(2), mapX(0) - 45, py + 4);
+            });
+
+            // Líneas de rejilla verticales (X)
+            const xTicks = [-2.0, -1.5, -1.0, -0.5, 0.5, 1.0];
+            xTicks.forEach(x => {
+                const px = mapX(x);
+                ctx.beginPath();
+                ctx.moveTo(px, mapY(yMin));
+                ctx.lineTo(px, mapY(yMax));
+                ctx.stroke();
+
+                // Etiquetas X
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '12px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(x.toFixed(1), px, mapY(0) + 25);
+            });
+
+            // Restablecer trazo continuo
+            ctx.setLineDash([]);
+
+            // 2. Ejes Principales en Negro
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+
+            // Eje X (y = 0)
+            ctx.beginPath();
+            ctx.moveTo(mapX(xMin), mapY(0));
+            ctx.lineTo(mapX(xMax), mapY(0));
+            ctx.stroke();
+
+            // Eje Y (x = 0)
+            ctx.beginPath();
+            ctx.moveTo(mapX(0), mapY(yMin));
+            ctx.lineTo(mapX(0), mapY(yMax));
+            ctx.stroke();
+
+            // Etiquetas de Ejes
+            ctx.fillStyle = '#000000';
+            ctx.font = '500 13px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('1 / [S] (mM⁻¹)', mapX(xMax), mapY(0) + 25);
+
+            ctx.textAlign = 'center';
+            ctx.fillText('1 / Vₒ (min/µmol)', mapX(0), mapY(yMax) - 10);
+
+            // 3. Trazado de la Recta de Lineweaver-Burk
+            const xStart = -0.7; // Extensión hacia la izquierda de la intersección X
+            const xEnd = 1.0;
+            const yStart = slope * xStart + interceptY;
+            const yEnd = slope * xEnd + interceptY;
+
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(mapX(xStart), mapY(yStart));
+            ctx.lineTo(mapX(xEnd), mapY(yEnd));
+            ctx.stroke();
+
+            // 4. Punto Intersección X (-1/Km)
+            const ptX = mapX(interceptX);
+            const ptY0 = mapY(0);
+
+            ctx.fillStyle = '#0066ff';
+            ctx.beginPath();
+            ctx.arc(ptX, ptY0, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Etiqueta Intersección X
+            ctx.fillStyle = '#0066ff';
+            ctx.font = '600 12px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`-1/Kₘ (${interceptX.toFixed(2)})`, ptX - 8, ptY0 - 8);
+
+            // 5. Punto Intersección Y (1/Vmax)
+            const ptX0 = mapX(0);
+            const ptY = mapY(interceptY);
+
+            ctx.fillStyle = '#e6007e';
+            ctx.beginPath();
+            ctx.arc(ptX0, ptY, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Etiqueta Intersección Y
+            ctx.fillStyle = '#e6007e';
+            ctx.font = '600 12px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`1/Vₘₐₓ (${interceptY.toFixed(3)})`, ptX0 + 10, ptY + 4);
+        }
+
+        // Listeners de actualización en tiempo real
+        vmaxInput.addEventListener('input', drawGraph);
+        kmInput.addEventListener('input', drawGraph);
+        window.addEventListener('resize', resizeCanvas);
+
+        // Inicialización al cargar la página
+        window.addEventListener('DOMContentLoaded', resizeCanvas);
+    </script>
+</body>
+</html>
